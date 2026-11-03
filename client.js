@@ -3,7 +3,6 @@ window.__ModuleLoader__.load({
   factory(require) {
     const React = require('react')
     const h = React.createElement
-    const CHANNEL = '/shenjing-brain'
     const ROUTE = '/api/shenjing-brain.'
 
     const S = {
@@ -14,20 +13,24 @@ window.__ModuleLoader__.load({
       row: { display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderTop: '0.5px solid var(--dsw-alias-border-l1)' },
       rowFirst: { borderTop: 'none', paddingTop: 0 },
       label: { width: '96px', flex: '0 0 auto', fontSize: '13px', color: 'var(--dsw-alias-label-secondary)' },
-      field: { flex: '1 1 auto', minWidth: 0, display: 'flex', gap: '8px', flexWrap: 'wrap' },
+      field: { flex: '1 1 auto', minWidth: 0, display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' },
       input: { flex: '1 1 160px', minWidth: '120px', height: '32px', padding: '0 10px', fontSize: '13px', color: 'var(--dsw-alias-label-primary)', background: 'var(--dsw-alias-bg-base)', border: '0.5px solid var(--dsw-alias-border-l2)', borderRadius: '8px', outline: 'none' },
       select: { flex: '1 1 140px', minWidth: '110px', height: '32px', padding: '0 8px', fontSize: '13px', color: 'var(--dsw-alias-label-primary)', background: 'var(--dsw-alias-bg-base)', border: '0.5px solid var(--dsw-alias-border-l2)', borderRadius: '8px' },
+      range: { flex: '1 1 140px', minWidth: '110px', accentColor: 'var(--dsw-alias-button-primary-fill)' },
+      num: { width: '48px', flex: '0 0 auto', textAlign: 'right', fontSize: '12px', fontVariantNumeric: 'tabular-nums', color: 'var(--dsw-alias-label-secondary)' },
       btn: { height: '32px', padding: '0 14px', fontSize: '13px', borderRadius: '8px', cursor: 'pointer', border: '0.5px solid var(--dsw-alias-border-l2)', background: 'var(--dsw-alias-bg-base)', color: 'var(--dsw-alias-label-primary)' },
       primary: { background: 'var(--dsw-alias-button-primary-fill)', borderColor: 'transparent', color: 'var(--dsw-alias-button-primary-label, #fff)' },
       hint: { fontSize: '12px', lineHeight: '18px', color: 'var(--dsw-alias-label-tertiary)', margin: '8px 0 0' },
       ok: { fontSize: '12px', color: 'var(--dsw-alias-state-success-primary)' },
       bad: { fontSize: '12px', color: 'var(--dsw-alias-state-error-primary)' },
       actions: { display: 'flex', gap: '8px', alignItems: 'center', marginTop: '16px', flexWrap: 'wrap' },
+      toggle: { display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--dsw-alias-label-primary)', cursor: 'pointer' },
+      meter: { display: 'flex', gap: '14px', flexWrap: 'wrap', fontSize: '12px', color: 'var(--dsw-alias-label-tertiary)', margin: '6px 0 0' },
     }
 
     const AREAS = [
       { key: 'expression', title: '表达区', hint: '每轮给主模型一句说话指令（语气、长度、重点）' },
-      { key: 'emotion', title: '情绪区', hint: '每轮结束后更新情绪与能量数值' },
+      { key: 'emotion', title: '情绪区', hint: '每轮结束后更新情绪数值' },
       { key: 'memory', title: '记忆区', hint: '筛选值得长期保留的一条记忆' },
     ]
 
@@ -62,14 +65,40 @@ window.__ModuleLoader__.load({
       }, props.options.map((o) => h('option', { key: o.value, value: o.value }, o.label)))
     }
 
+    function Slider(props) {
+      const v = typeof props.value === 'number' ? props.value : Number(props.value) || 0
+      return h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 160px', minWidth: '140px' } }, [
+        h('input', {
+          key: 'i', type: 'range', style: S.range, min: 0, max: 100, step: 5,
+          value: Math.round(v * 100),
+          onChange: (e) => props.onChange(Number(e.target.value) / 100),
+        }),
+        h('span', { key: 'n', style: S.num }, Math.round(v * 100) + '%'),
+      ])
+    }
+
+    function Toggle(props) {
+      return h('label', { style: S.toggle }, [
+        h('input', {
+          key: 'c', type: 'checkbox',
+          checked: props.value === true,
+          onChange: (e) => props.onChange(e.target.checked),
+        }),
+        h('span', { key: 's' }, props.text || ''),
+      ])
+    }
+
     function Section(props) {
       const ctx = props.ctx
       const [cfg, setCfg] = React.useState(null)
       const [providers, setProviders] = React.useState([])
       const [credential, setCredential] = React.useState({ configured: false })
+      const [vectorCredential, setVectorCredential] = React.useState({ configured: false })
       const [models, setModels] = React.useState({})
       const [efforts, setEfforts] = React.useState({})
       const [apiKey, setApiKey] = React.useState('')
+      const [vectorKey, setVectorKey] = React.useState('')
+      const [endocrine, setEndocrine] = React.useState(null)
       const [busy, setBusy] = React.useState('')
       const [notice, setNotice] = React.useState(null)
       const [error, setError] = React.useState('')
@@ -81,6 +110,8 @@ window.__ModuleLoader__.load({
           setCfg(state.config)
           setProviders(state.providers || [])
           setCredential(state.credential || { configured: false })
+          setVectorCredential(state.vectorCredential || { configured: false })
+          setEndocrine(state.endocrine || null)
         } catch (e) {
           setError(String(e && e.message ? e.message : e))
         }
@@ -89,6 +120,7 @@ window.__ModuleLoader__.load({
       React.useEffect(() => { load() }, [load])
 
       const patch = (next) => setCfg((prev) => ({ ...prev, ...next }))
+      const numOf = (key, fallback) => (typeof cfg[key] === 'number' ? cfg[key] : Number(cfg[key]) || fallback)
 
       const loadModels = React.useCallback(async (provider) => {
         if (!provider || models[provider]) return
@@ -154,10 +186,11 @@ window.__ModuleLoader__.load({
         try {
           const payload = { config: cfg }
           if (apiKey) payload.apiKey = apiKey
+          if (vectorKey) payload.vectorApiKey = vectorKey
           const value = await call(ctx, 'save', payload)
           setCfg(value.config)
           setCredential(value.credential || credential)
-          setApiKey('')
+          setApiKey(''); setVectorKey('')
           setNotice('已保存，下一轮生效')
         } catch (e) {
           setError(String(e && e.message ? e.message : e))
@@ -176,8 +209,8 @@ window.__ModuleLoader__.load({
       const test = async (area) => {
         setBusy('test:' + area); setNotice(null); setError('')
         try {
-          const value = await call(ctx, 'test', { area, draft: cfg, apiKey })
-          setNotice(area + ' 连通正常（' + value.ms + 'ms）')
+          const value = await call(ctx, 'test', { area, draft: cfg, apiKey, vectorApiKey: vectorKey })
+          setNotice((area === 'vector' ? '向量检索' : area) + ' 连通正常（' + value.ms + 'ms）' + (value.sample ? ' · ' + value.sample : ''))
         } catch (e) {
           setError(String(e && e.message ? e.message : e))
         } finally { setBusy('') }
@@ -231,6 +264,24 @@ window.__ModuleLoader__.load({
               onChange: (e) => patch({ [area.key + 'ExternalEffort']: e.target.value }),
             })))
         }
+        if (area.key === 'expression') {
+          rows.push(h(Row, { key: 'rich', label: '情绪丰富度' },
+            h(Slider, { value: numOf('expressionRichness', 0.5), onChange: (v) => patch({ expressionRichness: v }) })))
+        }
+        if (area.key === 'emotion') {
+          rows.push(h(Row, { key: 'sens', label: '情绪敏感度' },
+            h(Slider, { value: numOf('emotionSensitivity', 0.8), onChange: (v) => patch({ emotionSensitivity: v }) })))
+        }
+        if (area.key === 'memory') {
+          rows.push(h(Row, { key: 'den', label: '读取密度' },
+            h(Slider, { value: numOf('memoryDensity', 0.5), onChange: (v) => patch({ memoryDensity: v }) })))
+          rows.push(h(Row, { key: 'vec', label: '向量检索' },
+            h(Toggle, {
+              value: cfg.memoryVectorEnabled === true,
+              text: '额外用嵌入模型重排记忆',
+              onChange: (v) => patch({ memoryVectorEnabled: v }),
+            })))
+        }
         return h('div', { style: S.card, key: area.key }, [
           h('h2', { style: S.h2, key: 't' }, area.title),
           h('p', { style: S.desc, key: 'd' }, area.hint),
@@ -240,6 +291,61 @@ window.__ModuleLoader__.load({
               busy === 'test:' + area.key ? '测试中…' : '测试这一路')),
         ])
       }
+
+      const endocrineCard = h('div', { style: S.card, key: 'endo' }, [
+        h('h2', { style: S.h2, key: 't' }, '内分泌'),
+        h('p', { style: S.desc, key: 'd' }, '慢变量：被情绪一点点带动，不随单轮跳动。关掉联动后只向基线回落。'),
+        h('div', { key: 'r' }, [
+          h(Row, { key: 's', label: '敏感度', first: true },
+            h(Slider, { value: numOf('endocrineSensitivity', 0.3), onChange: (v) => patch({ endocrineSensitivity: v }) })),
+          h(Row, { key: 'l', label: '与情绪联动' },
+            h(Toggle, {
+              value: cfg.endocrineLinked !== false,
+              text: '情绪变化带动内分泌',
+              onChange: (v) => patch({ endocrineLinked: v }),
+            })),
+        ]),
+        endocrine ? h('p', { style: S.meter, key: 'm' },
+          '当前：valence ' + Number(endocrine.valence || 0).toFixed(2)
+          + ' · energy ' + Number(endocrine.energy || 0).toFixed(2)
+          + ' · tension ' + Number(endocrine.tension || 0).toFixed(2)
+          + ' · 来源 ' + (endocrine.source === 'emotion' ? '情绪联动' : '基线回落')) : null,
+      ])
+
+      const vectorCard = h('div', { style: S.card, key: 'vec' }, [
+        h('h2', { style: S.h2, key: 't' }, '向量检索'),
+        h('p', { style: S.desc, key: 'd' }, 'POST {Base URL}/embeddings。留空 Base URL 就复用上面的外部 API 地址；模型名要填向量模型，不能填对话模型。'),
+        h('div', { key: 'r' }, [
+          h(Row, { key: 'u', label: 'Base URL', first: true },
+            h('input', {
+              style: S.input, placeholder: '留空 = 复用外部 API 的 Base URL',
+              value: cfg.vectorBaseUrl || '',
+              onChange: (e) => patch({ vectorBaseUrl: e.target.value }),
+            })),
+          h(Row, { key: 'm', label: '向量模型' },
+            h('input', {
+              style: S.input, placeholder: '如 text-embedding-3-small / Qwen/Qwen3-Embedding-8B',
+              value: cfg.vectorModel || '',
+              onChange: (e) => patch({ vectorModel: e.target.value }),
+            })),
+          h(Row, { key: 'k', label: 'API Key' },
+            h('input', {
+              style: S.input, type: 'password',
+              placeholder: vectorCredential.configured ? '已保存（留空不改）' : '未保存（留空 = 用外部 API 那把）',
+              value: vectorKey,
+              onChange: (e) => setVectorKey(e.target.value),
+            })),
+          h(Row, { key: 'r2', label: '密钥引用' },
+            h('input', {
+              style: S.input, placeholder: 'SHENJING_BRAIN_API_KEY',
+              value: cfg.vectorApiKeyRef || '',
+              onChange: (e) => patch({ vectorApiKeyRef: e.target.value }),
+            })),
+        ]),
+        h('div', { style: S.actions, key: 'a' },
+          h('button', { style: S.btn, disabled: busy !== '', onClick: () => test('vector') },
+            busy === 'test:vector' ? '测试中…' : '测试向量端点')),
+      ])
 
       return h('div', { style: S.wrap }, [
         h('div', { style: S.card, key: 'ext' }, [
@@ -276,6 +382,8 @@ window.__ModuleLoader__.load({
           h('p', { style: S.hint, key: 'h' }, credential.configured ? '密钥状态：已保存（来源 ' + (credential.source || 'file') + '）' : '密钥状态：未保存'),
         ]),
         ...AREAS.map(areaCard),
+        endocrineCard,
+        vectorCard,
         h('div', { key: 'act', style: S.actions }, [
           h('button', { key: 's', style: { ...S.btn, ...S.primary }, disabled: busy !== '', onClick: save }, busy === 'save' ? '保存中…' : '保存'),
           h('button', { key: 'r', style: S.btn, disabled: busy !== '', onClick: load }, '重新读取'),

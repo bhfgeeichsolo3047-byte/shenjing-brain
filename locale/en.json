@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Shenjing · Brain Regions",
-    "description": "Background emotion and memory models with per-turn expression guidance and static fallback."
+    "description": "Background emotion, endocrine and memory models that shape each turn's expression hint. Each area can use a routed model or an external API, with adjustable sensitivity, richness and memory density."
   }
 }

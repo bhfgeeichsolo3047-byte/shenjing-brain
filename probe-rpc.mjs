@@ -40,6 +40,9 @@ const config = {
   expressionExternalModel: '', expressionExternalEffort: '',
   emotionExternalModel: '', emotionExternalEffort: '',
   memoryExternalModel: '', memoryExternalEffort: '',
+  emotionSensitivity: 0.8, expressionRichness: 0.5, endocrineSensitivity: 0.3, endocrineLinked: true,
+  memoryDensity: 0.5, memoryVectorEnabled: false,
+  vectorBaseUrl: '', vectorApiKeyRef: 'SHENJING_BRAIN_API_KEY', vectorModel: '',
   expressionMode: 'dynamic', timeoutMs: 20000, recentTurns: 6, memoryLimit: 100, cooldownMs: 120000,
   archiveDir: '/tmp',
 }
@@ -75,6 +78,9 @@ console.log('test', tested.ok, tested.ok ? tested.value.ms + 'ms' : tested.error
 
 const cleared = await call('save', { config: state2.value.config, clearKey: true })
 console.log('clearKey', cleared.ok, JSON.stringify(cleared.value.credential))
+
+const vectorTest = await call('test', { area: 'vector', draft: state2.value.config })
+console.log('vector test (无模型名，应报错)', vectorTest.ok, vectorTest.ok ? vectorTest.value.sample : vectorTest.error.message)
 
 const missing = await call('nope', {})
 console.log('unknown endpoint', missing.ok, missing.error.code)
