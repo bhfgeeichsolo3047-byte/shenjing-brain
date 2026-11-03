@@ -26,3 +26,21 @@
 插件不花钱、不删除档案、不主动外发消息。小模型使用当前 DSH 的模型路由，复用已有凭据；插件不保存 API 密钥。
 
 第一版没有生成后自动重写，也没有 UI 面板。安装后新启动的 Agent 才挂载每轮提示；已有 Agent 的注册情况需以实际运行日志验证。
+
+## 安装与仓库
+
+源码仓库：https://github.com/bhfgeeichsolo3047-byte/shenjing-brain
+
+本地开发用 link 装法（本机就是这个）：
+
+```bash
+cd /root/.dsh/profiles/web
+pnpm add link:/root/Documents/deepseek-harness/default-workspace/shenjing-brain
+```
+
+然后在 profile 的 `dsh.profile.bundles` 里列出 `@shenjing/brain-regions`，重启宿主。
+
+状态目录在 `$DSH_HOME/shenjing-brain/`（config.json、emotion.json、memories.json、health.json、logs/），不进仓库。
+
+`node selfcheck.mjs` 跑自检；`probe-*.mjs` 是排障时用的探测脚本，不进 `files` 白名单。
+
